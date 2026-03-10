@@ -571,7 +571,7 @@ def fetch_all_sports_schedule_auto(date: str, show_progress: bool = True) -> dic
     
     # v3.0.5 优化：阿里云 + MCP 双源搜索
     query4 = f"{date} 足球赛程表 直播时间表 中超 CSL 英超 西甲 意甲 德甲 法甲 比赛时间 对阵 主场 vs"
-    search4 = aliyun_web_search(query4, enable_search=True, timeout=15, show_progress=False, use_mcp_fallback=True)
+    search4 = aliyun_web_search(query4, enable_search=True, timeout=15, show_progress=False, use_multi_source=True)
     
     # v3.0.5: 如果双源都无结果，尝试纯英文 MCP 搜索
     if not search4:
