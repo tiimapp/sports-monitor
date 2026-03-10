@@ -26,6 +26,32 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, 'config.json')
 INTERESTS_PATH = os.path.join(SCRIPT_DIR, 'interests.json')
 
+
+
+# ============================================================================
+# 加载动画（v3.0.3 新增）
+# ============================================================================
+
+def show_loading_animation(message: str = "加载中", duration: float = 0.5, dots: int = 3):
+    """
+    显示简单的加载动画（v3.0.3 新增）
+    
+    Args:
+        message: 显示的消息
+        duration: 每个状态的持续时间（秒）
+        dots: 点的数量
+    """
+    import time
+    import sys
+    
+    for i in range(dots):
+        sys.stdout.write(f"\r{message}{'.' * (i + 1)}")
+        sys.stdout.flush()
+        time.sleep(duration / dots)
+    sys.stdout.write("\r" + " " * (len(message) + dots + 5) + "\r")
+    sys.stdout.flush()
+
+
 # ============================================================================
 # 阿里云配置
 # ============================================================================
@@ -196,22 +222,43 @@ def fetch_football_fixtures_auto(date: str) -> dict:
     return fixtures
 
 
-def fetch_all_sports_schedule_auto(date: str) -> dict:
+def fetch_all_sports_schedule_auto(date: str, show_progress: bool = True) -> dict:
     """
-    自动获取热门赛事赛程（v3.0.4 简化版）
+    自动获取热门赛事赛程（v3.0.3 分批搜索优化版）
     
-    只搜索核心项目，避免超时：
-    - 第 1 批：篮球（NBA + CBA 全明星）
-    - 第 2 批：电竞（LPL + LCK）
+    分成 4 批搜索，避免单次超时：
+    - 第 1 批：篮球（NBA + CBA 全明星）(10s 超时)
+    - 第 2 批：电竞（LPL + LCK）(10s 超时)
+    - 第 3 批：羽毛球 + 网球 (10s 超时)
+    - 第 4 批：足球 (15s 超时)
+    
+    Args:
+        date: 日期字符串
+        show_progress: 显示进度提示
+    
+    Returns:
+        包含所有赛事数据的字典
     """
     result = {
         'basketball': {'nba': [], 'cba_allstar': []},
-        'esports': {'lpl': [], 'lck': []}
+        'esports': {'lpl': [], 'lck': []},
+        'badminton': [],
+        'tennis': [],
+        'football': {}
     }
     
-    # ========== 第 1 批：篮球（15秒超时）==========
-    query1 = f"{date} NBA 赛程 CBA 全明星"
-    search1 = aliyun_web_search(query1, enable_search=True, timeout=10)
+    total_batches = 4
+    current_batch = 0
+    
+    # ========== 第 1 批：篮球（10 秒超时）==========
+    current_batch += 1
+    if show_progress:
+        print(f"⏳ 搜索进度 [{current_batch}/{total_batches}] 篮球 (NBA + CBA)...")
+        show_loading_animation("   正在搜索", duration=0.3, dots=3)
+    
+    # T4 优化：添加"今天"、"直播"等关键词提高准确性
+    query1 = f"{date} NBA 赛程 今天 比赛时间 CBA 全明星 直播"
+    search1 = aliyun_web_search(query1, enable_search=True, timeout=10, show_progress=False)
     
     if search1:
         for line in search1.split('\n'):
@@ -229,9 +276,18 @@ def fetch_all_sports_schedule_auto(date: str) -> dict:
                     'description': line[:60]
                 })
     
-    # ========== 第 2 批：电竞（15秒超时）==========
-    query2 = f"{date} LPL LCK 赛程"
-    search2 = aliyun_web_search(query2, enable_search=True, timeout=10)
+    if show_progress:
+        print(f"✅ 批次 {current_batch} 完成")
+    
+    # ========== 第 2 批：电竞（10 秒超时）==========
+    current_batch += 1
+    if show_progress:
+        print(f"⏳ 搜索进度 [{current_batch}/{total_batches}] 电竞 (LPL + LCK)...")
+        show_loading_animation("   正在搜索", duration=0.3, dots=3)
+    
+    # T4 优化：添加具体战队名和"春季赛"等关键词
+    query2 = f"{date} LPL 春季赛 LCK 赛程 今天 WBG EDG BLG JDG GEN T1"
+    search2 = aliyun_web_search(query2, enable_search=True, timeout=10, show_progress=False)
     
     if search2:
         for line in search2.split('\n'):
@@ -256,6 +312,63 @@ def fetch_all_sports_schedule_auto(date: str) -> dict:
                     'time': time,
                     'description': line[:60]
                 })
+    
+    if show_progress:
+        print(f"✅ 批次 {current_batch} 完成")
+    
+    # ========== 第 3 批：羽毛球 + 网球（10 秒超时）==========
+    current_batch += 1
+    if show_progress:
+        print(f"⏳ 搜索进度 [{current_batch}/{total_batches}] 羽毛球 + 网球...")
+        show_loading_animation("   正在搜索", duration=0.3, dots=3)
+    
+    # T4 优化：添加具体赛事名称提高准确性
+    query3 = f"{date} 羽毛球赛程 网球赛程 ATP WTA 全英赛 今天 比赛时间"
+    search3 = aliyun_web_search(query3, enable_search=True, timeout=10, show_progress=False)
+    
+    if search3:
+        for line in search3.split('\n'):
+            line = line.strip()
+            if len(line) < 10 or '根据' in line:
+                continue
+            
+            time_match = re.search(r'(\d{1,2}:\d{2})', line)
+            time = time_match.group(1) if time_match else 'TBD'
+            
+            # 羽毛球
+            if any(kw in line for kw in ['羽毛球', '汤尤杯', '苏迪曼杯', '全英赛']):
+                result['badminton'].append({
+                    'time': time,
+                    'description': line[:60],
+                    'tournament': '羽毛球赛事'
+                })
+            # 网球
+            elif any(kw in line for kw in ['网球', 'ATP', 'WTA', '大满贯']):
+                result['tennis'].append({
+                    'time': time,
+                    'description': line[:60],
+                    'tournament': '网球赛事'
+                })
+    
+    if show_progress:
+        print(f"✅ 批次 {current_batch} 完成")
+    
+    # ========== 第 4 批：足球（15 秒超时）==========
+    current_batch += 1
+    if show_progress:
+        print(f"⏳ 搜索进度 [{current_batch}/{total_batches}] 足球 (中超 + 五大联赛)...")
+        show_loading_animation("   正在搜索", duration=0.4, dots=4)
+    
+    # T4 优化：添加"直播"、"对阵"等关键词，并指定具体球队
+    query4 = f"{date} 足球赛程 中超 英超 西甲 意甲 德甲 法甲 直播 对阵 比赛时间"
+    search4 = aliyun_web_search(query4, enable_search=True, timeout=15, show_progress=False)
+    
+    if search4:
+        result['football'] = parse_football_fixtures(search4, date)
+    
+    if show_progress:
+        print(f"✅ 批次 {current_batch} 完成")
+        print(f"🎉 全部搜索完成！\n")
     
     return result
 
@@ -396,6 +509,84 @@ def get_cba_info() -> dict:
         'key_matchups': ['广东 vs 辽宁（辽粤大战）', '北京 vs 广东（京粤大战）'],
         'broadcast': 'CCTV5、咪咕视频、腾讯体育',
         'popularity': 75
+    }
+
+
+
+
+def get_broadcast_info() -> dict:
+    """
+    获取各赛事直播平台信息（v3.0.3 新增）
+    
+    Returns:
+        包含各赛事直播平台信息的字典
+    """
+    return {
+        'nba': {
+            'name': 'NBA',
+            'platforms': ['腾讯体育', '咪咕视频', 'CCTV5（精选）'],
+            'url': 'https://sports.qq.com/nba/'
+        },
+        'cba': {
+            'name': 'CBA',
+            'platforms': ['CCTV5', '咪咕视频', '央视频', '抖音'],
+            'url': 'https://www.cba.net.cn/'
+        },
+        'premier_league': {
+            'name': '英超',
+            'platforms': ['爱奇艺体育', '咪咕视频', 'CCTV5（精选）'],
+            'url': 'https://sports.iqiyi.com/'
+        },
+        'la_liga': {
+            'name': '西甲',
+            'platforms': ['爱奇艺体育', '咪咕视频'],
+            'url': 'https://sports.iqiyi.com/'
+        },
+        'serie_a': {
+            'name': '意甲',
+            'platforms': ['爱奇艺体育', '咪咕视频'],
+            'url': 'https://sports.iqiyi.com/'
+        },
+        'bundesliga': {
+            'name': '德甲',
+            'platforms': ['爱奇艺体育', '咪咕视频', 'CCTV5（精选）'],
+            'url': 'https://sports.iqiyi.com/'
+        },
+        'ligue_1': {
+            'name': '法甲',
+            'platforms': ['爱奇艺体育', '咪咕视频'],
+            'url': 'https://sports.iqiyi.com/'
+        },
+        'csl': {
+            'name': '中超',
+            'platforms': ['CCTV5', '咪咕视频', '腾讯体育'],
+            'url': 'https://www.slchina.cn/'
+        },
+        'lpl': {
+            'name': 'LPL',
+            'platforms': ['B 站', '虎牙直播', '斗鱼直播', '英雄联盟赛事官网'],
+            'url': 'https://lpl.qq.com/'
+        },
+        'lck': {
+            'name': 'LCK',
+            'platforms': ['B 站', '虎牙直播'],
+            'url': 'https://lck.qq.com/'
+        },
+        'badminton': {
+            'name': '羽毛球',
+            'platforms': ['CCTV5', '咪咕视频', '优酷体育'],
+            'url': ''
+        },
+        'tennis': {
+            'name': '网球',
+            'platforms': ['CCTV5', '爱奇艺体育', '咪咕视频'],
+            'url': ''
+        },
+        'f1': {
+            'name': 'F1',
+            'platforms': ['CCTV5', '腾讯体育', '咪咕视频'],
+            'url': 'https://www.formula1.com/'
+        }
     }
 
 
@@ -544,7 +735,7 @@ def query_today_matches(config: dict, interests: dict) -> str:
     display_rules = interests.get('display_rules', {})
     
     # 执行综合搜索（一次性获取所有赛事）
-    all_sports_data = fetch_all_sports_schedule_auto(today)
+    all_sports_data = fetch_all_sports_schedule_auto(today, show_progress=True)
     # 获取足球赛程（单独搜索更准确）
     football_data = fetch_football_fixtures_auto(today)
     # 获取 NBA 赛程（官方 CDN）
@@ -904,6 +1095,63 @@ def query_today_matches(config: dict, interests: dict) -> str:
     
     if not has_content:
         result.append("\n⚠️  今日暂无您关注的赛事")
+    
+    # ========== 添加直播平台信息（v3.0.3 新增）==========
+    result.append(f"\n{'='*60}")
+    result.append("📺 直播平台汇总")
+    result.append('='*60)
+    
+    broadcast_info = get_broadcast_info()
+    broadcast_lines = []
+    
+    # NBA
+    if 'nba' in broadcast_info:
+        info = broadcast_info['nba']
+        broadcast_lines.append(f"🏀 {info['name']}: {', '.join(info['platforms'])}")
+    
+    # CBA
+    if 'cba' in broadcast_info:
+        info = broadcast_info['cba']
+        broadcast_lines.append(f"🏀 {info['name']}: {', '.join(info['platforms'])}")
+    
+    # 足球
+    football_leagues = ['csl', 'premier_league', 'la_liga', 'serie_a', 'bundesliga', 'ligue_1']
+    football_platforms = set()
+    for league in football_leagues:
+        if league in broadcast_info:
+            for platform in broadcast_info[league]['platforms']:
+                football_platforms.add(platform)
+    
+    if football_platforms:
+        broadcast_lines.append(f"⚽ 足球（中超/五大联赛）: {', '.join(sorted(football_platforms))}")
+    
+    # 电竞
+    esports_leagues = ['lpl', 'lck']
+    esports_platforms = set()
+    for league in esports_leagues:
+        if league in broadcast_info:
+            for platform in broadcast_info[league]['platforms']:
+                esports_platforms.add(platform)
+    
+    if esports_platforms:
+        broadcast_lines.append(f"🎮 电竞（LPL/LCK）: {', '.join(sorted(esports_platforms))}")
+    
+    # 羽毛球
+    if 'badminton' in broadcast_info:
+        info = broadcast_info['badminton']
+        broadcast_lines.append(f"🏸 {info['name']}: {', '.join(info['platforms'])}")
+    
+    # 网球
+    if 'tennis' in broadcast_info:
+        info = broadcast_info['tennis']
+        broadcast_lines.append(f"🎾 {info['name']}: {', '.join(info['platforms'])}")
+    
+    # F1
+    if 'f1' in broadcast_info:
+        info = broadcast_info['f1']
+        broadcast_lines.append(f"🏎️ {info['name']}: {', '.join(info['platforms'])}")
+    
+    result.extend(broadcast_lines)
     
     result.append(f"\n{'='*60}")
     result.append("💡 提示：数据来自阿里云 WebSearch 实时搜索，如有偏差请告知")
