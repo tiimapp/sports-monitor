@@ -1,4 +1,4 @@
-# Sports Monitor Skill - 体育赛事监控
+# Sports Station Skill - 体育赛事监控
 
 监控用户感兴趣的体育赛事赛程，智能推荐值得观看的比赛。
 

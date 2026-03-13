@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Sports Monitor - 体育赛事监控技能 v4.0.2
+Sports Station - 体育赛事监控技能 v4.0.2
 固定输出格式版本 - 每个比赛一行，格式稳定
 
 支持：NBA, CBA, 中超，欧洲五大联赛，F1
@@ -640,7 +640,7 @@ def query_today_matches(interests: dict) -> str:
 # ============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description='Sports Monitor v4.0.3 - 固定格式赛事监控')
+    parser = argparse.ArgumentParser(description='Sports Station v4.0.3 - 固定格式赛事监控')
     parser.add_argument('--today', action='store_true', help='查看今天的比赛')
     parser.add_argument('--push-discord', action='store_true', help='将比赛摘要推送到 Discord')
     args = parser.parse_args()
