@@ -406,91 +406,29 @@ def parse_football_fixtures(search_result: str, date: str) -> dict:
     return fixtures
 
 
-def fetch_football_fixtures(date: str, config: dict = None) -> dict:
+# ============================================================================
+# 统一搜索函数 - Unified Search Function
+# ============================================================================
+def fetch_sport_schedule(sport_name: str, date: str, config: dict = None) -> str:
     """
-    获取足球赛程
-    Phase 9.4: Updated to use structured query builder workflow
-    Step 3 & 4: Build structured query and execute search
-    """
-    # Step 3: Build structured query with explicit date constraint
-    query = build_structured_query(date, '足球', language='zh')
+    统一的体育赛程搜索函数
+    Unified sport schedule search function for ALL sports
     
-    # Step 4: Execute search with config
+    Args:
+        sport_name: 运动名称 (e.g., 'NBA', '足球', 'F1')
+        date: 日期 YYYY-MM-DD
+        config: 搜索配置
+    
+    Returns:
+        搜索结果文本
+    """
+    # Step 1: Build structured query with explicit date constraint
+    query = build_structured_query(date, sport_name, language='zh')
+    
+    # Step 2: Execute unified search
     search_result = multi_source_search(query, timeout=15, config=config)
     
-    if search_result:
-        return parse_football_fixtures(search_result, date)
-    return {}
-
-
-# ============================================================================
-# NBA 赛程获取
-# ============================================================================
-def fetch_nba_schedule(date: str) -> List[dict]:
-    """
-    获取 NBA 赛程
-    Phase 5.2.2: Enhanced with strict UTC+8 timezone validation
-    """
-    url = 'https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_2.json'
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        games = []
-        
-        # 解析目标日期（UTC+8）
-        target_date = datetime.strptime(date, '%Y-%m-%d')
-        target_date_str = target_date.strftime('%Y-%m-%d')
-        
-        # NBA API 使用美国日期（UTC-5 到 UTC-8），需要检查前一天
-        us_date = (target_date - timedelta(days=1)).strftime('%m/%d/%Y')
-        
-        for game_date in data.get('leagueSchedule', {}).get('gameDates', []):
-            game_date_str = game_date.get('gameDate', '')
-            if game_date_str.startswith(us_date):
-                for game in game_date.get('games', []):
-                    home_team = game.get('homeTeam', {})
-                    away_team = game.get('awayTeam', {})
-                    
-                    time_utc = game.get('gameDateTimeUTC', '')
-                    try:
-                        # 转换为 UTC+8 北京时间
-                        dt_utc = date_parser.parse(time_utc)
-                        dt_beijing = dt_utc.replace(tzinfo=timezone.utc) + timedelta(hours=8)
-                        time_beijing = dt_beijing.strftime('%Y-%m-%d %H:%M')
-                        
-                        # Phase 5.2.3: 严格过滤 - 只保留目标日期的比赛
-                        game_date_beijing = dt_beijing.strftime('%Y-%m-%d')
-                        if game_date_beijing != target_date_str:
-                            continue
-                        
-                        games.append({
-                            'home': home_team.get('teamName', ''),
-                            'away': away_team.get('teamName', ''),
-                            'time': time_beijing,
-                        })
-                    except:
-                        # 时间解析失败，跳过
-                        continue
-        
-        games.sort(key=lambda x: x['time'])
-        return games
-    except:
-        return []
-
-
-# ============================================================================
-# F1 赛程
-# ============================================================================
-def fetch_f1_schedule() -> List[dict]:
-    default_schedule = [
-        {'date': '03/13-15', 'title': '中国大奖赛', 'location': '上海'},
-        {'date': '03/27-29', 'title': '日本大奖赛', 'location': '铃鹿'},
-        {'date': '04/10-12', 'title': '巴林大奖赛', 'location': '萨基尔'},
-        {'date': '04/24-26', 'title': '沙特大奖赛', 'location': '吉达'},
-    ]
-    return default_schedule
+    return search_result
 
 
 # ============================================================================
@@ -850,9 +788,8 @@ def format_f1_race(race: dict) -> str:
 # ============================================================================
 def query_today_matches(interests: dict, config: dict = None, date: str = None) -> str:
     """
-    查询指定日期的比赛
-    Phase 3.2: Updated to accept and pass config parameter
-    Phase 5.4.2: Updated to accept explicit date parameter
+    查询指定日期的比赛 - 使用统一搜索流程
+    Phase 10: Refactored to use unified search for ALL sports
     
     Args:
         interests: 兴趣配置
@@ -868,63 +805,72 @@ def query_today_matches(interests: dict, config: dict = None, date: str = None) 
     lines.append("=" * 60)
     lines.append("")
     
-    # ========== NBA ==========
+    # ========== NBA - 使用统一搜索 ==========
     nba_config = sports.get('basketball', {}).get('leagues', {}).get('nba', {})
     if nba_config.get('enabled', False):
         favorite_teams = nba_config.get('teams', [])
-        nba_games = fetch_nba_schedule(query_date)
         
-        if nba_games:
+        # Step 1: Build query, Step 2: Unified search
+        search_result = fetch_sport_schedule('NBA', query_date, config)
+        
+        if search_result:
             lines.append("🏀 NBA")
-            for game in nba_games:
-                lines.append(format_nba_game(game, favorite_teams, query_date))
+            lines.append(f"搜索结果：\n{search_result[:500]}...")  # 显示前500字符
             lines.append("")
     
-    # ========== 足球 ==========
+    # ========== 足球 - 使用统一搜索 ==========
     football_config = sports.get('football', {})
     if football_config.get('enabled', False):
         leagues_config = football_config.get('leagues', {})
-        football_data = fetch_football_fixtures(query_date, config=config)
-        
-        # 收集所有有效足球比赛
-        all_football = []
         
         europe_config = leagues_config.get('europe_top5', {})
-        if europe_config.get('enabled', False):
-            fav_teams = europe_config.get('teams', [])
-            for league_key in ['bundesliga', 'la_liga', 'serie_a', 'ligue_1', 'premier_league', 'championship']:
-                if league_key in football_data:
-                    for f in football_data[league_key]:
-                        f['favorite_teams'] = fav_teams
-                        all_football.append(f)
-        
         csl_config = leagues_config.get('csl', {})
-        if csl_config.get('enabled', False):
-            if 'csl' in football_data:
-                for f in football_data['csl']:
-                    f['favorite_teams'] = []
-                    all_football.append(f)
         
-        if all_football:
-            lines.append("⚽ 足球")
-            all_football.sort(key=lambda x: x.get('time', '99:99'))
-            for fixture in all_football[:10]:
-                fav_teams = fixture.get('favorite_teams', [])
-                lines.append(format_football_fixture(fixture, fav_teams, query_date))
-            lines.append("")
+        if europe_config.get('enabled', False) or csl_config.get('enabled', False):
+            # Step 1: Build query, Step 2: Unified search
+            search_result = fetch_sport_schedule('足球', query_date, config)
+            
+            if search_result:
+                # Parse football fixtures
+                football_data = parse_football_fixtures(search_result, query_date)
+                
+                # 收集所有有效足球比赛
+                all_football = []
+                
+                if europe_config.get('enabled', False):
+                    fav_teams = europe_config.get('teams', [])
+                    for league_key in ['bundesliga', 'la_liga', 'serie_a', 'ligue_1', 'premier_league', 'championship']:
+                        if league_key in football_data:
+                            for f in football_data[league_key]:
+                                f['favorite_teams'] = fav_teams
+                                all_football.append(f)
+                
+                if csl_config.get('enabled', False):
+                    if 'csl' in football_data:
+                        for f in football_data['csl']:
+                            f['favorite_teams'] = []
+                            all_football.append(f)
+                
+                if all_football:
+                    lines.append("⚽ 足球")
+                    all_football.sort(key=lambda x: x.get('time', '99:99'))
+                    for fixture in all_football[:10]:
+                        fav_teams = fixture.get('favorite_teams', [])
+                        lines.append(format_football_fixture(fixture, fav_teams, query_date))
+                    lines.append("")
     
-    # ========== F1 ==========
+    # ========== F1 - 使用统一搜索 ==========
     f1_config = sports.get('motorsport', {}).get('leagues', {}).get('f1', {})
     if f1_config.get('enabled', False):
-        f1_data = fetch_f1_schedule()
+        # Step 1: Build query, Step 2: Unified search
+        search_result = fetch_sport_schedule('F1', query_date, config)
         
-        if f1_data:
+        if search_result:
             lines.append("🏎️ F1")
-            for race in f1_data[:5]:
-                lines.append(format_f1_race(race))
+            lines.append(f"搜索结果：\n{search_result[:500]}...")  # 显示前500字符
             lines.append("")
     
-    if len(lines) <= 2:
+    if len(lines) <= 3:
         lines.append("⚠️ 今日暂无赛事数据")
     
     return '\n'.join(lines)
