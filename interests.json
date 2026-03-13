@@ -1,6 +1,6 @@
 {
-  "version": "3.0.1",
-  "updated_at": "2026-03-07",
+  "version": "3.0.2",
+  "updated_at": "2026-03-11",
   "sports": {
     "basketball": {
       "name": "篮球",
@@ -81,28 +81,9 @@
         }
       }
     },
-    "esports": {
-      "name": "电竞",
-      "priority": 5,
-      "enabled": true,
-      "leagues": {
-        "lpl": {
-          "name": "LPL 春季赛",
-          "priority": 1,
-          "enabled": true,
-          "teams": ["WBG", "EDG", "BLG", "JDG"]
-        },
-        "lck": {
-          "name": "LCK 春季赛",
-          "priority": 2,
-          "enabled": true,
-          "teams": ["GEN", "T1"]
-        }
-      }
-    },
     "golf": {
       "name": "高尔夫",
-      "priority": 6,
+      "priority": 5,
       "enabled": true,
       "tournaments": {
         "lpga_blue_bay": {
@@ -115,7 +96,7 @@
     },
     "ice_hockey": {
       "name": "冰球",
-      "priority": 7,
+      "priority": 6,
       "enabled": true,
       "leagues": {
         "khl": {
@@ -132,15 +113,17 @@
       }
     },
     "motorsport": {
-      "name": "赛车",
-      "priority": 8,
+      "name": "F1 赛车",
+      "priority": 7,
       "enabled": true,
       "leagues": {
         "f1": {
           "name": "F1 一级方程式",
           "priority": 1,
           "enabled": true,
-          "teams": ["Red Bull Racing", "Mercedes", "Ferrari", "McLaren"]
+          "teams": ["Red Bull Racing", "Mercedes", "Ferrari", "McLaren"],
+          "drivers": ["Verstappen", "Hamilton", "Leclerc", "Russell", "Norris", "Piastri"],
+          "race_name": "2026赛季"
         }
       }
     },

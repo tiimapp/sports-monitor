@@ -444,77 +444,6 @@ def is_favorite_team(team_name: str, favorite_teams: List[str]) -> bool:
     return False
 
 
-
-# ============================================================================
-# Discord 推送函数
-# ============================================================================
-def get_discord_webhook_url() -> str:
-    """获取 Discord webhook URL"""
-    # 从环境变量获取
-    webhook_url = os.environ.get('DISCORD_GAMEDAY_WEBHOOK')
-    if webhook_url and webhook_url != 'YOUR_DISCORD_WEBHOOK_URL_HERE':
-        return webhook_url
-    
-    # 从配置文件获取
-    config_path = os.path.join(SCRIPT_DIR, 'discord_config.json')
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                webhook_url = config.get('webhook_url', '')
-                if webhook_url and webhook_url != 'YOUR_DISCORD_WEBHOOK_URL_HERE':
-                    return webhook_url
-        except:
-            pass
-    
-    return ""
-
-def send_discord_message(message: str, webhook_url: str = None) -> bool:
-    """
-    发送消息到 Discord
-    
-    Args:
-        message: 要发送的消息内容
-        webhook_url: Discord webhook URL，如果为 None 则从环境变量或配置文件获取
-    
-    Returns:
-        bool: 发送成功返回 True，否则返回 False
-    """
-    if not webhook_url:
-        webhook_url = get_discord_webhook_url()
-    
-    if not webhook_url:
-        print("警告: Discord webhook URL 未配置，跳过推送")
-        print("请在环境变量中设置 DISCORD_GAMEDAY_WEBHOOK 或在 discord_config.json 中配置 webhook_url")
-        return False
-    
-    try:
-        # Discord 单条消息最大长度限制为 2000 字符
-        content = message[:1990] if len(message) > 1990 else message
-        
-        # 使用 requests 发送 POST 请求
-        response = requests.post(
-            webhook_url,
-            json={"content": content},
-            headers={"Content-Type": "application/json"},
-            timeout=30
-        )
-        
-        if response.status_code == 204:
-            print("✓ 成功发送到 Discord")
-            return True
-        else:
-            print(f"✗ 发送失败: HTTP {response.status_code}")
-            print(f"响应: {response.text}")
-            return False
-            
-    except requests.exceptions.Timeout:
-        print("✗ 发送超时")
-        return False
-    except Exception as e:
-        print(f"✗ 发送过程中出错: {e}")
-        return False
-
 def format_nba_game(game: dict, favorite_teams: List[str]) -> str:
     home = game.get('home', '')
     away = game.get('away', '')
@@ -638,11 +567,9 @@ def query_today_matches(interests: dict) -> str:
 # ============================================================================
 # 主程序
 # ============================================================================
-
 def main():
-    parser = argparse.ArgumentParser(description='Sports Monitor v4.0.3 - 固定格式赛事监控')
+    parser = argparse.ArgumentParser(description='Sports Monitor v4.0.2 - 固定格式赛事监控')
     parser.add_argument('--today', action='store_true', help='查看今天的比赛')
-    parser.add_argument('--push-discord', action='store_true', help='将比赛摘要推送到 Discord')
     args = parser.parse_args()
     
     interests = load_interests()
@@ -650,10 +577,6 @@ def main():
     if args.today:
         result = query_today_matches(interests)
         print(result)
-        
-        # 如果指定了 --push-discord 参数，则推送消息
-        if args.push_discord:
-            send_discord_message(result)
 
 
 if __name__ == '__main__':
