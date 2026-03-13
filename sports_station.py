@@ -844,10 +844,10 @@ def main():
     主程序
     Phase 3.1: Load config and pass to query functions
     Phase 5.4: Add explicit date parameter support
+    Phase 7: Remove general date terms (--today removed)
     """
     parser = argparse.ArgumentParser(description='Sports Station v4.0.3 - 可配置搜索工具 + 严格时区控制')
-    parser.add_argument('--today', action='store_true', help='查看今天的比赛（UTC+8）')
-    parser.add_argument('--date', type=str, help='查看指定日期的比赛（格式：YYYY-MM-DD 或 YYYY/MM/DD，UTC+8）')
+    parser.add_argument('--date', type=str, required=True, help='查看指定日期的比赛（格式：YYYY-MM-DD 或 YYYY/MM/DD，UTC+8）')
     parser.add_argument('--push-discord', action='store_true', help='将比赛摘要推送到 Discord')
     args = parser.parse_args()
     
@@ -855,37 +855,28 @@ def main():
     config = load_config()
     interests = load_interests()
     
-    # Phase 5.4: 确定查询日期
-    query_date = None
-    if args.date:
-        # 使用指定日期（支持 YYYY-MM-DD 或 YYYY/MM/DD 格式）
-        date_str = args.date.replace('/', '-')
-        try:
-            # 验证日期格式
-            datetime.strptime(date_str, '%Y-%m-%d')
-            query_date = date_str
-        except ValueError:
-            print(f"❌ 错误：日期格式无效。请使用 YYYY-MM-DD 或 YYYY/MM/DD 格式（例如：2026-03-13 或 2026/03/13）")
-            return
-    elif args.today:
-        # 使用今天的日期（UTC+8）
-        query_date = get_beijing_date_str()
+    # Phase 7: 使用显式日期（支持 YYYY-MM-DD 或 YYYY/MM/DD 格式）
+    date_str = args.date.replace('/', '-')
+    try:
+        # 验证日期格式
+        datetime.strptime(date_str, '%Y-%m-%d')
+        query_date = date_str
+    except ValueError:
+        print(f"❌ 错误：日期格式无效。请使用 YYYY-MM-DD 或 YYYY/MM/DD 格式（例如：2026-03-13 或 2026/03/13）")
+        return
     
-    if query_date:
-        # 显示查询的日期
-        date_display = format_search_date_context(query_date)
-        print(f"🔍 查询日期：{date_display}")
-        print()
-        
-        # Phase 5.4.4: Pass config and date to query function
-        result = query_today_matches(interests, config=config, date=query_date)
-        print(result)
-        
-        # 如果指定了 --push-discord 参数，则推送消息
-        if args.push_discord:
-            send_discord_message(result)
-    else:
-        parser.print_help()
+    # 显示查询的日期
+    date_display = format_search_date_context(query_date)
+    print(f"🔍 查询日期：{date_display}")
+    print()
+    
+    # Phase 5.4.4: Pass config and date to query function
+    result = query_today_matches(interests, config=config, date=query_date)
+    print(result)
+    
+    # 如果指定了 --push-discord 参数，则推送消息
+    if args.push_discord:
+        send_discord_message(result)
 
 
 if __name__ == '__main__':
